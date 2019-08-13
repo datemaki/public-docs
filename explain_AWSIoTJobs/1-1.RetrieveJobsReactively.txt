@@ -1,0 +1,34 @@
+@startuml
+title 1-1. 受動的なJob取得
+
+participant "IoTデバイス"
+participant "AWS IoT MQTT Broker"
+participant "AWS IoT Jobs"
+box "AWS IoT（このAWS内の処理は全て推測で記載）" #Orange
+	participant "AWS IoT MQTT Broker"
+	participant "AWS IoT Jobs"
+end box
+actor 管理者
+
+note over "IoTデバイス" : デバイス起動時に実行
+"IoTデバイス" -> "IoTデバイス" : アプリケーション起動
+activate "IoTデバイス"
+
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify" をSubscribeする
+activate "AWS IoT MQTT Broker"
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify-next" をSubscribeする
+
+"AWS IoT Jobs" <- "管理者" : 新たなJobを作成する（※データ定義1-1-1）
+activate "AWS IoT Jobs"
+
+"AWS IoT MQTT Broker" <- "AWS IoT Jobs" : 作成されたJobの情報を、既定のMQTT TopicにPublishするよう指示
+deactivate "AWS IoT Jobs"
+
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify" にJobの情報をPublishする（※データ定義1-1-2）
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify-next" にJobの情報をPublishする（※データ定義1-1-3）
+
+"IoTデバイス" -> "IoTデバイス" : PublishされたJSONドキュメントから、job documentを取り出す
+
+== 「Jobの実行」フローに続く ==
+
+@enduml

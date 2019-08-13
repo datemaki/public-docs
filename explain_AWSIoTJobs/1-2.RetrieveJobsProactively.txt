@@ -1,0 +1,36 @@
+@startuml
+title 1-2. 能動的なJob取得
+
+participant "IoTデバイス"
+participant "AWS IoT MQTT Broker"
+participant "AWS IoT Jobs"
+box "AWS IoT（このAWS内の処理は全て推測で記載）" #Orange
+	participant "AWS IoT MQTT Broker"
+	participant "AWS IoT Jobs"
+end box
+actor 管理者
+
+"AWS IoT Jobs" <- "管理者" : 新たなJobを作成する
+"AWS IoT MQTT Broker" <- "AWS IoT Jobs" : 作成されたJobの情報を、既定のMQTT TopicにPublishするよう指示
+[<-- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify" にJobの情報をPublishする
+[<-- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify-next" にJobの情報をPublishする
+note over "IoTデバイス" :	この時点では対象となるTopicをSubscribeしていないため、\n上記の通知は受け取れない
+
+note over "IoTデバイス" : 能動的なJob取得処理を開始
+
+"IoTデバイス" -> "IoTデバイス" : アプリケーション起動
+activate "IoTデバイス"
+
+activate "AWS IoT MQTT Broker"
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/+/get/accepted" をSubscribeする
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/+/get/rejected" をSubscribeする
+"IoTデバイス" -> "AWS IoT MQTT Broker" : 空のメッセージを MQTT Topic "$aws/things/{{Thing Name}}/jobs/$next/get" にPublishする
+"AWS IoT MQTT Broker" -> "AWS IoT Jobs" : 当該デバイスで次に実行されるべきJobの情報を取得する
+"AWS IoT MQTT Broker" <- "AWS IoT Jobs" : 当該デバイスで次に実行されるべきJobの情報を、既定のMQTT TopicにPublishするよう指示する
+
+
+"IoTデバイス" <- "AWS IoT MQTT Broker" : job documentが MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/accepted" にPublishされる (※データ定義1-2-1)
+"IoTデバイス" -> "IoTデバイス" : PublishされたJSONドキュメントから、job documentを取り出す
+
+== 「Jobの実行」フローに続く ==
+@enduml

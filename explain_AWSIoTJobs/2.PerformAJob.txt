@@ -1,0 +1,57 @@
+@startuml
+
+title 2. Jobの実行
+
+participant "IoTデバイス"
+participant "S3 Bucket"
+participant "AWS IoT MQTT Broker"
+participant "AWS IoT Jobs"
+box "AWS IoT（このAWS内の処理は全て推測で記載）" #Orange
+	participant "AWS IoT MQTT Broker"
+	participant "AWS IoT Jobs"
+end box
+actor 管理者
+
+activate "IoTデバイス"
+activate "AWS IoT MQTT Broker"
+activate "AWS IoT Jobs"
+
+== 「Jobの実行」 ==
+
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update/accepted" をSubscribeする
+"IoTデバイス" -> "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update/rejected" をSubscribeする
+
+note over "IoTデバイス" : Jobの開始
+
+"IoTデバイス" -> "AWS IoT MQTT Broker" : Jobのstatusを "IN_PROGRESS" として更新する。\nそのために "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update" にメッセージをPublishする\n（※データ定義2-1-1）
+
+"AWS IoT MQTT Broker" -> "AWS IoT Jobs" : 対象Jobのstatusを "IN_PROGRESS" に変更する
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update/accepted" に更新結果がPublishされる\n（※データ定義2-1-2）
+"AWS IoT Jobs" <- "管理者" : 管理者はAWS Management Consoleなどから、\n対象Jobの実行状況について、デバイスそれぞれごとのステータスを確認できる
+
+"IoTデバイス" -> "S3 Bucket" : JobDocumentに従い、配信ファイルをダウンロードする
+activate "S3 Bucket"
+"IoTデバイス" <- "S3 Bucket" : JobDocumentに従い、配信ファイルをダウンロードする
+deactivate "S3 Bucket"
+
+"IoTデバイス" -> "AWS IoT MQTT Broker" : 対象JobのstatusDetailsを詳細ステータス情報で更新する。 \nそのために "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update" にメッセージをPublishする\n（※データ定義2-1-3）
+"AWS IoT MQTT Broker" -> "AWS IoT Jobs" : 対象JobのstatusDetailsを、Publishされたメッセージ内容で更新する
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update/accepted" に更新結果がPublishされる\n（※データ定義2-1-4）
+
+"IoTデバイス" -> "IoTデバイス" : JobDocumentに従い、指示された処理を実行する\n(e.g. 配信ファイルを既定のローカルパスに格納する／ソフトウェアアップデートを行う、など)
+
+"IoTデバイス" -> "AWS IoT MQTT Broker" : 処理の実行結果に応じて、対象Jobのstatusを "SUCCEEDED" / "FAILED" に変更する。\nそのために "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update" にメッセージをPublishする\n（※データ定義2-1-5）
+"AWS IoT MQTT Broker" -> "AWS IoT Jobs" : 対象Jobのstatusを "SUCCEEDED" / "FAILED" に変更する
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/{{Job Id}}/update/accepted" に更新結果がPublishされる\n（※データ定義2-1-6）
+"AWS IoT Jobs" <- "管理者" : 管理者はAWS Management Consoleなどから、\n対象Jobが正常終了／異常終了したか、デバイスそれぞれごとの実行結果を確認できる
+
+note over "IoTデバイス" : Jobの終了
+
+== 次のJob情報のPublish ==
+
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify" に残りのJobの情報をPublishする（※データ定義1-1-2）
+"IoTデバイス" <- "AWS IoT MQTT Broker" : MQTT Topic "$aws/things/{{Thing Name}}/jobs/notify-next" に次のJobの情報をPublishする（※データ定義1-1-3）
+
+== 再度「Jobの実行」に続く（notify-nextにPublishされるメッセージがなくなる・notifyに空の配列がPublishされるまで） ==
+
+@enduml
